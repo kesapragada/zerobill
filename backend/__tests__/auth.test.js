@@ -1,7 +1,6 @@
 // backend/__tests__/auth.test.js
 const request = require('supertest');
 const app = require('../app');
-const User = require('../models/User');
 
 describe('Auth API Endpoints', () => {
   const testUser = { email: 'test@example.com', password: 'password123' };
