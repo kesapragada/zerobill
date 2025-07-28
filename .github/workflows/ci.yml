@@ -38,12 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint # [FIX] This job now depends on the 'lint' job
 
-    services:
-      mongodb:
-        image: mongo:latest
-        ports:
-          - 27017:27017
-
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
