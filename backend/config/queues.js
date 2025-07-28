@@ -1,7 +1,7 @@
-// zerobill/backend/config/queues.js
+//backend/config/queues.js
 const { Queue } = require('bullmq');
 const { QUEUE_NAMES } = require('./constants');
-const redisConnection = require('./redis');
+const redisConnection = require('./redis'); // This is the connection object
 
 const billingFetchQueue = new Queue(QUEUE_NAMES.BILLING_FETCH, { connection: redisConnection });
 const metaSchedulerQueue = new Queue(QUEUE_NAMES.META_SCHEDULER, { connection: redisConnection });
@@ -13,4 +13,5 @@ module.exports = {
   metaSchedulerQueue,
   infraFetchQueue,
   discrepancyEngineQueue,
+  connection: redisConnection, // <--- ADD THIS LINE
 };

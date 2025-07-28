@@ -1,18 +1,16 @@
 // backend/jest.setup.js
 
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-
-// --- ADD THIS LINE ---
-// Import the Redis connection object from your application.
-// Adjust the path to './config/queues' if it's different.
-const { connection: redisConnection } = require('./config/queues');
-
+// --- Mocks should always come first ---
 jest.mock('ioredis', () => require('ioredis-mock'));
 jest.mock('./socketManager', () => ({
   initializeSocketServer: jest.fn(),
   getSocketEmitter: jest.fn(() => ({ to: jest.fn(() => ({ emit: jest.fn() })) })),
 }));
+
+// --- Then, your regular imports ---
+const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
+const { connection: redisConnection } = require('./config/queues');
 
 let mongoServer;
 
@@ -22,7 +20,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // --- ADD THIS LINE ---
   // Gracefully close the mock Redis connection
   await redisConnection.quit();
 
