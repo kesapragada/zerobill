@@ -9,7 +9,8 @@
     "dev:worker": "nodemon --config nodemon-worker.json",
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:worker\"",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "jest --runInBand"
+
 
 
   },
