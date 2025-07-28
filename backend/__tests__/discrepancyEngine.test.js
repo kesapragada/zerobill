@@ -1,5 +1,5 @@
 // backend/__tests__/discrepancyEngine.test.js
-const mongoose = require('mongoose'); // <-- THE MISSING LINE
+const mongoose = require('mongoose');
 const discrepancyProcessor = require('../workers/discrepancyEngine');
 const BillingSnapshot = require('../models/BillingSnapshot');
 const ResourceSnapshot = require('../models/ResourceSnapshot');

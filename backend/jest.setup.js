@@ -5,6 +5,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 // --- Mock External Dependencies ---
 jest.mock('ioredis', () => require('ioredis-mock'));
 jest.mock('./socketManager', () => ({
+  initializeSocketServer: jest.fn(),
   getSocketEmitter: jest.fn(() => ({ to: jest.fn(() => ({ emit: jest.fn() })) })),
 }));
 
