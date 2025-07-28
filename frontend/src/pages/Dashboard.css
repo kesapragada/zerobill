@@ -1,0 +1,123 @@
+/* zerobill/frontend/src/pages/Dashboard.css */
+
+.dashboard-container {
+    width: 100%;
+    max-width: 960px;
+    margin: auto;
+    padding: 1rem;
+    text-align: left;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #444;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.dashboard-header h1 {
+    margin: 0;
+    font-size: 2em;
+}
+
+.logout-button {
+    background-color: #4a5568;
+}
+
+.logout-button:hover {
+    background-color: #2d3748;
+    border-color: #718096;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.notification {
+    padding: 1rem;
+    background-color: #2d3748;
+    border: 1px solid #4a5568;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.data-section {
+    margin-top: 2rem;
+}
+
+.data-section h3 {
+    font-size: 1.5em;
+    border-bottom: 1px solid #444;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.discrepancy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.discrepancy-card {
+    background-color: #2d3748;
+    border: 1px solid #4a5568;
+    border-radius: 8px;
+    padding: 1.25rem;
+    transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.discrepancy-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.severity-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1a202c;
+}
+
+.service-name {
+    font-weight: bold;
+    color: #cbd5e0;
+}
+
+.description {
+    margin: 0 0 0.5rem 0;
+    color: #a0aec0;
+}
+
+.resource-id {
+    font-size: 0.9rem;
+    color: #718096;
+}
+
+.resource-id code {
+    background-color: #1a202c;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.no-discrepancies {
+    background-color: #2f855a;
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+}
