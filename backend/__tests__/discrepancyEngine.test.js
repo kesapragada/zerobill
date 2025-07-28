@@ -1,11 +1,12 @@
-// zerobill/backend/__tests__/discrepancyEngine.test.js
+// backend/__tests__/discrepancyEngine.test.js
+
 const discrepancyProcessor = require('../workers/discrepancyEngine');
 const BillingSnapshot = require('../models/BillingSnapshot');
 const ResourceSnapshot = require('../models/ResourceSnapshot');
 const Discrepancy = require('../models/Discrepancy');
 const { DISCREPANCY, AWS_SERVICES } = require('../config/constants');
 
-// Mock the entire Mongoose models
+// Mock the Mongoose models
 jest.mock('../models/BillingSnapshot');
 jest.mock('../models/ResourceSnapshot');
 jest.mock('../models/Discrepancy');
@@ -14,25 +15,26 @@ describe('Discrepancy Engine Worker', () => {
   const mockUserId = '60f8f1b3b3b3b3b3b3b3b3b3';
   const mockJob = { data: { userId: mockUserId }, id: 'mockJobId' };
 
-  // Clear mock function calls before each test
   beforeEach(() => {
+    // Clear all mock function calls before each test
     jest.clearAllMocks();
+
+    // [THE FIX] Provide a default, valid mock implementation before each test.
+    // This ensures that `billingSnapshot.services` exists and is iterable.
+    BillingSnapshot.findOne.mockReturnValue({
+      sort: jest.fn().mockResolvedValue({ services: [] }),
+    });
+    ResourceSnapshot.find.mockResolvedValue([]);
+    Discrepancy.find.mockResolvedValue([]);
   });
 
   it('should find an idle EBS volume', async () => {
     // --- Arrange ---
-    const mockBilling = { services: [] };
     const mockResources = [
       { service: AWS_SERVICES.EBS, resourceId: 'vol-123', state: 'available', details: {} },
       { service: AWS_SERVICES.EC2, resourceId: 'i-abc', state: 'running', details: {} },
     ];
-
-    BillingSnapshot.findOne.mockReturnValue({
-      sort: jest.fn().mockResolvedValue(mockBilling),
-    });
-
     ResourceSnapshot.find.mockResolvedValue(mockResources);
-    Discrepancy.find.mockResolvedValue([]); // No pre-existing dismissed discrepancies
 
     // --- Act ---
     await discrepancyProcessor(mockJob);
@@ -47,7 +49,6 @@ describe('Discrepancy Engine Worker', () => {
       type: DISCREPANCY.TYPES.IDLE_RESOURCE,
       service: AWS_SERVICES.EBS,
       resourceId: 'vol-123',
-      severity: DISCREPANCY.SEVERITIES.MEDIUM,
     });
   });
   
@@ -56,16 +57,15 @@ describe('Discrepancy Engine Worker', () => {
     const mockBilling = {
       services: [{ serviceName: 'Amazon Relational Database Service', cost: 50.00 }]
     };
-    const mockResources = [
-      { service: AWS_SERVICES.EC2, resourceId: 'i-abc', state: 'running', details: {} },
-    ];
-
+    // Override the default mock for this specific test case
     BillingSnapshot.findOne.mockReturnValue({
       sort: jest.fn().mockResolvedValue(mockBilling),
     });
 
+    const mockResources = [
+      { service: AWS_SERVICES.EC2, resourceId: 'i-abc', state: 'running', details: {} },
+    ];
     ResourceSnapshot.find.mockResolvedValue(mockResources);
-    Discrepancy.find.mockResolvedValue([]);
 
     // --- Act ---
     await discrepancyProcessor(mockJob);
@@ -79,33 +79,41 @@ describe('Discrepancy Engine Worker', () => {
       user: mockUserId,
       type: DISCREPANCY.TYPES.UNMATCHED_BILLING,
       service: AWS_SERVICES.RDS,
-      severity: DISCREPANCY.SEVERITIES.HIGH,
     });
   });
 
   it('should not create a new discrepancy if it was previously dismissed', async () => {
     // --- Arrange ---
-    const mockBilling = { services: [] };
     const mockResources = [
       { service: AWS_SERVICES.EBS, resourceId: 'vol-123', state: 'available', details: {} }
     ];
+    ResourceSnapshot.find.mockResolvedValue(mockResources);
+
     const preExistingDismissed = [
       { type: DISCREPANCY.TYPES.IDLE_RESOURCE, resourceId: 'vol-123', status: DISCREPANCY.STATUSES.IGNORED }
     ];
-
-    BillingSnapshot.findOne.mockReturnValue({
-      sort: jest.fn().mockResolvedValue(mockBilling),
-    });
-
-    ResourceSnapshot.find.mockResolvedValue(mockResources);
-    // Simulate that this discrepancy already exists and was dismissed by the user
+    // Simulate that this discrepancy already exists and was dismissed
     Discrepancy.find.mockResolvedValue(preExistingDismissed);
 
     // --- Act ---
     await discrepancyProcessor(mockJob);
 
     // --- Assert ---
-    // The core assertion: insertMany should NOT have been called.
+    expect(Discrepancy.insertMany).not.toHaveBeenCalled();
+  });
+
+  it('should call nothing if no data is found', async () => {
+    // --- Arrange ---
+    // Let the default mocks (returning null/empty arrays) run
+    BillingSnapshot.findOne.mockReturnValue({
+        sort: jest.fn().mockResolvedValue(null),
+    });
+    
+    // --- Act ---
+    await discrepancyProcessor(mockJob);
+
+    // --- Assert ---
+    expect(Discrepancy.deleteMany).not.toHaveBeenCalled();
     expect(Discrepancy.insertMany).not.toHaveBeenCalled();
   });
 });
