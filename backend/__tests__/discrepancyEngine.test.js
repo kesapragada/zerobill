@@ -15,15 +15,19 @@ describe('Discrepancy Engine Worker', () => {
   const mockUserId = '60f8f1b3b3b3b3b3b3b3b3b3';
   const mockJob = { data: { userId: mockUserId }, id: 'mockJobId' };
 
+  // This beforeEach hook runs before every single test in this file.
   beforeEach(() => {
-    // Clear all mock function calls before each test
+    // Reset all mock function calls to ensure tests are isolated.
     jest.clearAllMocks();
 
-    // [THE FIX] Provide a default, valid mock implementation before each test.
-    // This ensures that `billingSnapshot.services` exists and is iterable.
-    BillingSnapshot.findOne.mockReturnValue({
+    // [THE FIX] Provide a default, robust mock implementation for all tests.
+    // This mock handles the .sort() chain and resolves to a valid object with an empty services array.
+    // Individual tests can override this if they need specific data.
+    BillingSnapshot.findOne.mockImplementation(() => ({
       sort: jest.fn().mockResolvedValue({ services: [] }),
-    });
+    }));
+
+    // Default mocks for other models
     ResourceSnapshot.find.mockResolvedValue([]);
     Discrepancy.find.mockResolvedValue([]);
   });
@@ -58,9 +62,9 @@ describe('Discrepancy Engine Worker', () => {
       services: [{ serviceName: 'Amazon Relational Database Service', cost: 50.00 }]
     };
     // Override the default mock for this specific test case
-    BillingSnapshot.findOne.mockReturnValue({
+    BillingSnapshot.findOne.mockImplementation(() => ({
       sort: jest.fn().mockResolvedValue(mockBilling),
-    });
+    }));
 
     const mockResources = [
       { service: AWS_SERVICES.EC2, resourceId: 'i-abc', state: 'running', details: {} },
@@ -101,13 +105,14 @@ describe('Discrepancy Engine Worker', () => {
     // --- Assert ---
     expect(Discrepancy.insertMany).not.toHaveBeenCalled();
   });
-
-  it('should call nothing if no data is found', async () => {
+  
+  it('should call nothing if no billing data is found', async () => {
     // --- Arrange ---
-    // Let the default mocks (returning null/empty arrays) run
-    BillingSnapshot.findOne.mockReturnValue({
-        sort: jest.fn().mockResolvedValue(null),
-    });
+    // Override the default mock to simulate no data being found
+    BillingSnapshot.findOne.mockImplementation(() => ({
+      sort: jest.fn().mockResolvedValue(null),
+    }));
+    ResourceSnapshot.find.mockResolvedValue([{ service: AWS_SERVICES.EC2, resourceId: 'i-abc' }]);
     
     // --- Act ---
     await discrepancyProcessor(mockJob);

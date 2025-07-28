@@ -60,4 +60,5 @@ jobs:
         env:
           MONGO_URI: mongodb://localhost:27017/zerobill-ci-test
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN: '1h' 
           FRONTEND_URL: http://localhost:3000
