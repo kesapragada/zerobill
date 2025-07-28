@@ -1,14 +1,13 @@
 // zerobill/frontend/src/api/axios.js
-
 import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  // [SECURITY FIX] This tells axios to include cookies in requests to the backend.
+  // This is the essential setting that tells the browser to
+  // automatically send the httpOnly cookie with every request.
   withCredentials: true 
 });
 
-// The old request interceptor for setting the 'Authorization' header is no longer needed
-// because the browser now handles the secure cookie automatically.
+// The old interceptor that manually added the Authorization header is no longer needed.
 
 export default api;

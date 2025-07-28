@@ -1,6 +1,7 @@
 // zerobill/backend/routes/auth.js
+
 const express = require("express");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
@@ -9,7 +10,7 @@ const logger = require("../config/logger");
 
 const router = express.Router();
 
-// Register
+// --- Register ---
 router.post("/register", async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -37,7 +38,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Login
+// --- Login (Refactored for httpOnly cookie) ---
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -60,16 +61,39 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN,
     });
+
+    res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
     
     logger.info({ userId: user._id, email }, "User logged in successfully.");
-    res.json({ token });
+
+    res.status(200).json({ 
+        _id: user._id, 
+        email: user.email,
+        createdAt: user.createdAt
+    });
+
   } catch (error) {
     logger.error({ err: error, email }, "Internal server error during login.");
     res.status(500).json({ message: "Internal server error during login." });
   }
 });
 
-// Forgot Password
+// --- Logout ---
+router.post('/logout', (req, res) => {
+    logger.info("User logout requested.");
+    res.cookie('token', '', {
+        httpOnly: true,
+        expires: new Date(0)
+    });
+    return res.status(200).json({ message: 'Logged out successfully' });
+});
+
+// --- Forgot Password ---
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
   try {
@@ -84,7 +108,6 @@ router.post("/forgot-password", async (req, res) => {
       await user.save();
       
       await sendResetEmail(user.email, resetToken);
-      logger.info({ userId: user._id, email }, "Password reset email sent.");
     } else {
       logger.info({ email }, "Password reset requested for non-existent email (failing silently).");
     }
@@ -96,7 +119,7 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-// Reset Password
+// --- Reset Password ---
 router.post("/reset-password/:token", async (req, res) => {
   const { newPassword } = req.body;
   const { token } = req.params;

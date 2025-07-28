@@ -1,19 +1,17 @@
 // zerobill/frontend/src/pages/Login.jsx
-
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import './AuthForm.css'; // Import shared auth form styles
+import './AuthForm.css';
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const { login } = useAuth();
+  const { login } = useAuth(); // Get the new login function from context
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,9 +29,9 @@ const Login = () => {
     setSuccess("");
 
     try {
-      // Use the new async login function from the context
+      // Use the new async login function. It will handle setting the user state.
       await login(email, password);
-      navigate("/"); // On success, navigate to the dashboard
+      navigate("/"); // Navigate to dashboard on success.
     } catch (err) {
       setError(err.response?.data?.message || "Login failed. Please check your credentials.");
     } finally {
@@ -50,23 +48,11 @@ const Login = () => {
         
         <div className="form-group">
           <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            required
-          />
+          <input id="email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
         </div>
         <div className="form-group">
           <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         <button type="submit" className="auth-button" disabled={loading}>
           {loading ? "Logging in..." : "Login"}

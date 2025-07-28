@@ -1,0 +1,16 @@
+#backend/.dockerignore
+# Dependency directory (these are installed inside the container)
+node_modules
+
+# Environment variables (these are injected at runtime)
+.env
+
+# Logs and temporary files
+npm-debug.log
+logs/
+
+# Git directory
+.git
+
+# Docker files
+Dockerfile

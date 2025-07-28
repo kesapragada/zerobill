@@ -1,0 +1,85 @@
+# zerobill/docker-compose.yml
+version: '3.8'
+
+services:
+  # --- Database Service ---
+  mongodb:
+    image: mongo:latest
+    container_name: zerobill-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    networks:
+      - zerobill-net
+
+  # --- Cache/Queue Service ---
+  redis:
+    image: redis:7-alpine # Using a specific version is good practice
+    container_name: zerobill-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - zerobill-net
+
+  # --- [FIX] API Service ---
+  # This service is ONLY responsible for the Express web server.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zerobill-api
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code for hot-reloading in development
+      - ./backend:/usr/src/app
+      # Anonymous volume to prevent local node_modules from overwriting container's
+      - /usr/src/app/node_modules
+    env_file:
+      - ./backend/.env
+    # [CRITICAL FIX] Use the appropriate command for nodemon in a Docker volume setup
+    # Note: Your `dev-docker` script is already perfect for this.
+    command: npm run dev-docker
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+    networks:
+      - zerobill-net
+  
+  # --- [FIX] Worker Service ---
+  # This service is ONLY responsible for running the BullMQ workers.
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zerobill-worker
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    env_file:
+      - ./backend/.env
+    # [CRITICAL FIX] Command to start ONLY the worker process.
+    # We use nodemon here for development consistency.
+    command: nodemon worker.js
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+    networks:
+      - zerobill-net
+
+# Define a shared network for services to communicate
+networks:
+  zerobill-net:
+    driver: bridge
+
+# Define persistent volumes
+volumes:
+  mongo-data:
+  redis-data:

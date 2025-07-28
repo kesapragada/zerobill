@@ -5,16 +5,22 @@
   "scripts": {
     "start": "node server.js",
     "worker": "node worker.js",
-    "dev": "concurrently \"nodemon server.js\" \"nodemon worker.js\"",
-    "test": "jest --watchAll --verbose --runInBand"
+    "dev:server": "nodemon server.js",
+    "dev:worker": "nodemon --config nodemon-worker.json",
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:worker\"",
+    "lint": "eslint .",
+    "test": "jest"
   },
+
   "dependencies": {
     "@aws-sdk/client-cost-explorer": "^3.583.0",
     "@aws-sdk/client-ec2": "^3.583.0",
     "@aws-sdk/client-rds": "^3.583.0",
     "@aws-sdk/client-s3": "^3.583.0",
     "@aws-sdk/client-sts": "^3.582.0",
-    "bcrypt": "^5.1.1",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@socket.io/redis-emitter": "^5.1.0",
+    "bcryptjs": "^3.0.2",
     "bullmq": "^5.7.13",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -24,7 +30,9 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.1",
     "nodemailer": "^6.9.13",
-    "pino": "^9.1.0"
+    "pino": "^9.1.0",
+    "socket.io": "^4.8.1",
+    "zerobill-monorepo": "file:.."
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
@@ -37,6 +45,8 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFilesAfterEnv": ["./jest.setup.js"]
+    "setupFilesAfterEnv": [
+      "./jest.setup.js"
+    ]
   }
 }

@@ -1,0 +1,6 @@
+{
+  "watch": ["workers/", "models/", "config/", "utils/"],
+  "ext": "js,json",
+  "ignore": ["*.test.js"],
+  "exec": "node worker.js"
+}
