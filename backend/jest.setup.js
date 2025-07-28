@@ -3,7 +3,18 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
 // --- Mock External Dependencies ---
-jest.mock('ioredis', () => require('ioredis-mock'));
+jest.mock('ioredis', () => {
+    return jest.fn().mockImplementation(() => ({
+        on: jest.fn(),
+        connect: jest.fn().mockResolvedValue(),
+        disconnect: jest.fn().mockResolvedValue(),
+        duplicate: jest.fn(() => ({
+            on: jest.fn(),
+            connect: jest.fn().mockResolvedValue(),
+            disconnect: jest.fn().mockResolvedValue(),
+        })),
+    }));
+});
 jest.mock('./socketManager', () => ({
   initializeSocketServer: jest.fn(),
   getSocketEmitter: jest.fn(() => ({ to: jest.fn(() => ({ emit: jest.fn() })) })),
