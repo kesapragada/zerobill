@@ -10,7 +10,6 @@ const AwsConfig = require('../models/AwsConfig');
 const ResourceSnapshot = require('../models/ResourceSnapshot');
 const { discrepancyEngineQueue } = require('../config/queues');
 const logger = require('../config/logger');
-const { AWS_SERVICES } = require('../config/constants');
 
 // --- Mock Logic Function ---
 async function runMock(userId) {
