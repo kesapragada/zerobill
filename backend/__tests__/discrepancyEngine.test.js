@@ -27,7 +27,10 @@ describe('Discrepancy Engine Worker', () => {
       { service: AWS_SERVICES.EC2, resourceId: 'i-abc', state: 'running', details: {} },
     ];
 
-    BillingSnapshot.findOne.mockResolvedValue(mockBilling);
+    BillingSnapshot.findOne.mockReturnValue({
+      sort: jest.fn().mockResolvedValue(mockBilling),
+    });
+
     ResourceSnapshot.find.mockResolvedValue(mockResources);
     Discrepancy.find.mockResolvedValue([]); // No pre-existing dismissed discrepancies
 
@@ -57,7 +60,10 @@ describe('Discrepancy Engine Worker', () => {
       { service: AWS_SERVICES.EC2, resourceId: 'i-abc', state: 'running', details: {} },
     ];
 
-    BillingSnapshot.findOne.mockResolvedValue(mockBilling);
+    BillingSnapshot.findOne.mockReturnValue({
+      sort: jest.fn().mockResolvedValue(mockBilling),
+    });
+
     ResourceSnapshot.find.mockResolvedValue(mockResources);
     Discrepancy.find.mockResolvedValue([]);
 
@@ -87,7 +93,10 @@ describe('Discrepancy Engine Worker', () => {
       { type: DISCREPANCY.TYPES.IDLE_RESOURCE, resourceId: 'vol-123', status: DISCREPANCY.STATUSES.IGNORED }
     ];
 
-    BillingSnapshot.findOne.mockResolvedValue(mockBilling);
+    BillingSnapshot.findOne.mockReturnValue({
+      sort: jest.fn().mockResolvedValue(mockBilling),
+    });
+
     ResourceSnapshot.find.mockResolvedValue(mockResources);
     // Simulate that this discrepancy already exists and was dismissed by the user
     Discrepancy.find.mockResolvedValue(preExistingDismissed);
