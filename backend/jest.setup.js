@@ -1,7 +1,6 @@
 // backend/jest.setup.js
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const IORedis = require('ioredis');
 
 // Mock the IORedis constructor to prevent it from making real connections.
 // We are telling Jest: "anytime someone tries to create a `new IORedis()`,
