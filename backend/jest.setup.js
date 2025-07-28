@@ -2,40 +2,55 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
-// Mock the IORedis constructor to prevent it from making real connections.
-// We are telling Jest: "anytime someone tries to create a `new IORedis()`,
-// give them this fake object instead."
+// --- Mock External Dependencies ---
+
+// Mock IORedis to prevent real Redis connections
 jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => {
-    return {
+  return jest.fn().mockImplementation(() => ({
+    on: jest.fn(),
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    duplicate: jest.fn(() => ({
       on: jest.fn(),
       connect: jest.fn(),
       disconnect: jest.fn(),
-      duplicate: jest.fn(() => ({
-          on: jest.fn(),
-          connect: jest.fn(),
-          disconnect: jest.fn(),
-      })),
-    };
-  });
+    })),
+  }));
 });
+
+// Mock BullMQ's Queue class
+jest.mock('bullmq', () => ({
+  Queue: jest.fn().mockImplementation(() => ({
+    add: jest.fn(),
+    addBulk: jest.fn(),
+  })),
+}));
+
+// Mock our SocketManager's emitter
+jest.mock('./socketManager', () => ({
+  initializeSocketServer: jest.fn(),
+  getSocketEmitter: jest.fn(() => ({
+    to: jest.fn(() => ({
+      emit: jest.fn(),
+    })),
+  })),
+}));
+
+// --- MongoDB In-Memory Server Setup ---
 
 let mongoServer;
 
-// Before all tests, create an in-memory MongoDB instance.
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
 });
 
-// After all tests, disconnect and stop the in-memory server.
 afterAll(async () => {
   await mongoose.disconnect();
   await mongoServer.stop();
 });
 
-// Clear all test data before each test.
 beforeEach(async () => {
     const collections = mongoose.connection.collections;
     for (const key in collections) {

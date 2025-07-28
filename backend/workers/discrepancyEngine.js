@@ -23,7 +23,8 @@ const processor = async (job) => {
     try {
         // 1. Fetch latest data
         const [billingSnapshot, resourceSnapshots] = await Promise.all([
-            BillingSnapshot.findOne({ user: userId }).sort({ createdAt: -1 }),
+            BillingSnapshot.findOne({ user: userId }, {}, { sort: { createdAt: -1 } }),
+
             ResourceSnapshot.find({ user: userId })
         ]);
 
