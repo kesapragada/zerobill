@@ -70,14 +70,15 @@ router.post("/login", authLimiter, async (req, res) => {
 
     res.cookie('token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        // CRITICAL FINAL FIX: REMOVE sameSite RESTRICTION
-        // sameSite: 'Lax', // COMMENT THIS LINE OUT
+        // Since we are running over HTTPS (Vercel/Render), we must use Secure: true
+        secure: process.env.NODE_ENV === 'production', 
+        // CRITICAL FINAL FIX: Explicitly set SameSite to None for guaranteed cross-domain sending.
+        sameSite: 'None', 
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
-
     
     logger.info({ userId: user._id, email }, "User logged in successfully.");
+
 
     res.status(200).json({ 
         _id: user._id, 
