@@ -1,117 +1,129 @@
-// zerobill/frontend/src/pages/ConfigureAWS.jsx
+// FILE: frontend/src/pages/ConfigureAWS.jsx
 
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext"; // Import our fortified hook
+import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import { useNavigate } from 'react-router-dom';
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+
+const copyToClipboard = (text, callback) => {
+  navigator.clipboard.writeText(text).then(() => {
+    callback();
+  }).catch(err => {
+    console.error("Failed to copy text: ", err);
+  });
+};
 
 const ConfigureAWS = () => {
-  // --- State Management ---
-  // [FIX] Get user and initial loading state directly from the AuthContext.
   const { user, isLoading: isAuthLoading } = useAuth();
+  const navigate = useNavigate();
   
-  // Local state for the form itself
-  const [formState, setFormState] = useState({
-    roleArn: "",
-    accessKeyId: "",
-    secretAccessKey: "",
-  });
-  
-  // [FIX] Use a clear, specific loading state for form submission.
+  const [step, setStep] = useState(1);
+  const [formState, setFormState] = useState({ roleArn: "", accessKeyId: "", secretAccessKey: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Local state for UI feedback
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState({ error: "", success: "", copied: "" });
 
-  // Load secret from environment variables
   const ZERO_BILL_ACCOUNT_ID = import.meta.env.VITE_ZERO_BILL_ACCOUNT_ID;
+  const permissionsPolicy = {
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Action": ["ce:GetCostAndUsage", "ec2:Describe*", "rds:DescribeDBInstances", "s3:ListAllMyBuckets", "s3:GetBucketLocation", "sts:GetCallerIdentity"],
+      "Resource": "*"
+    }]
+  };
+  const trustPolicyPrincipal = { "AWS": `arn:aws:iam::${ZERO_BILL_ACCOUNT_ID}:root` };
 
-  // --- Event Handlers ---
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormState((prev) => ({ ...prev, [name]: value }));
+  const handleCopy = (textToCopy, fieldName) => {
+    copyToClipboard(textToCopy, () => {
+      setFeedback(prev => ({ ...prev, copied: fieldName, error: "", success: "" }));
+      setTimeout(() => setFeedback(prev => ({ ...prev, copied: "" })), 2000);
+    });
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormState(prev => ({ ...prev, [name]: value }));
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setError("");
-    setSuccess("");
-
+    setFeedback({ error: "", success: "", copied: "" });
     try {
       const res = await api.post("/aws/configure", formState);
-      setSuccess(res.data.message);
-      setFormState({ roleArn: "", accessKeyId: "", secretAccessKey: "" });
+      setFeedback({ success: res.data.message, error: "", copied: "" });
+      setStep(4); // Move to final success step
     } catch (err) {
-      setError(err.response?.data?.message || "Configuration failed. Please try again.");
+      setFeedback({ error: err.response?.data?.message || "Configuration failed.", success: "", copied: "" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- JSON Snippets for User ---
-  const permissionsPolicy = { /* ... remains the same ... */ };
-  const trustRelationship = {
-    "Version": "2012-10-17",
-    "Statement": [{
-        "Effect": "Allow",
-        "Principal": { "AWS": `arn:aws:iam::${ZERO_BILL_ACCOUNT_ID}:root` },
-        "Action": "sts:AssumeRole",
-        "Condition": {
-            "StringEquals": { "sts:ExternalId": user?._id || "YOUR_UNIQUE_ID_HERE" }
-        }
-    }]
-  };
-  
-  // [MAJOR BUG FIX] This is the correct "early return" pattern.
-  // It handles the initial loading state before attempting to render the main component.
   if (isAuthLoading) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Verifying authentication...</div>;
+    return <div className="text-center p-8 text-navy-light">Verifying authentication...</div>;
   }
 
-  // This is the main return statement for the component.
+  const formInputStyles = "form-input block w-full bg-navy-darkest border-navy-medium rounded-lg text-navy-lightest placeholder-navy-light focus:ring-brand-primary focus:border-brand-primary";
+
   return (
-    <div style={{ maxWidth: "800px", margin: "auto", padding: "2rem" }}>
-      <h2>🔐 Configure AWS Access for ZeroBill</h2>
-      <p>Follow these steps to grant ZeroBill secure, read-only access to your AWS account.</p>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <h1 className="text-3xl font-bold text-navy-lightest">Configure AWS Access</h1>
+      <p className="text-navy-light">Grant ZeroBill secure, read-only access to your AWS account in a few steps.</p>
 
-      <div style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginTop: '2rem' }}>
-        <h4><strong>Step 1: Create the Read-Only Permissions Policy in AWS</strong></h4>
-        <p>In your AWS account, go to IAM → Policies → Create Policy. Click the JSON tab and paste this:</p>
-        <pre style={{ background: "#f4f4f4", padding: "1rem", whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-          <code>{JSON.stringify(permissionsPolicy, null, 2)}</code>
-        </pre>
-        <p>Name the policy something memorable, like `ZeroBillReadOnlyAccess`.</p>
-      </div>
+      <Card className={step < 1 ? 'opacity-50' : ''}>
+        <h2 className="text-xl font-semibold text-white">Step 1: Create Permissions Policy</h2>
+        <p className="mt-2 text-navy-light">In your AWS IAM console, go to Policies → Create Policy. Click the JSON tab and paste this code. Name it `ZeroBillReadOnlyAccess`.</p>
+        <div className="relative mt-4">
+          <pre className="bg-navy-darkest p-4 rounded-md text-sm text-gray-300 overflow-x-auto"><code>{JSON.stringify(permissionsPolicy, null, 2)}</code></pre>
+          <Button onClick={() => handleCopy(JSON.stringify(permissionsPolicy, null, 2), 'policy')} className="absolute top-2 right-2 !py-1 !px-2 text-xs">{feedback.copied === 'policy' ? "Copied!" : "Copy"}</Button>
+        </div>
+        {step === 1 && <Button onClick={() => setStep(2)} className="mt-4">Next: Create Role</Button>}
+      </Card>
 
-      <div style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginTop: '2rem' }}>
-        <h4><strong>Step 2: Create the IAM Role</strong></h4>
-        <p>Go to IAM → Roles → Create Role. Select "AWS account" and "Another AWS account".</p>
-        <p>Enter our Account ID: <strong>{ZERO_BILL_ACCOUNT_ID}</strong></p>
-        <p>Under Options, check "Require external ID" and enter your unique ID below:</p>
-        <pre style={{ background: "#eee", border: '1px solid #ccc', padding: '1rem', fontWeight: 'bold' }}>{user?._id}</pre>
-        <p>On the next screen, attach the `ZeroBillReadOnlyAccess` policy you just created. Name the role something like `ZeroBillRole`.</p>
-      </div>
-      
-      <div style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginTop: '2rem' }}>
-        <h4><strong>Step 3: Create a Temporary IAM User (for verification only)</strong></h4>
-        <p>Go to IAM → Users → Create User. Name it `zerobill-temp-verifier`. Attach the `STS:AssumeRole` permission directly to this user, limited to the `ZeroBillRole` ARN you just created. Generate an access key for this user. These keys will be used once to verify the setup and will NOT be stored.</p>
-      </div>
+      <Card className={step < 2 ? 'opacity-50' : ''}>
+        <h2 className="text-xl font-semibold text-white">Step 2: Create IAM Role</h2>
+        <p className="mt-2 text-navy-light">Go to IAM → Roles → Create Role. Select "Custom trust policy" and paste the policy below. This grants our AWS account permission to assume the role.</p>
+        <div className="relative mt-4">
+          <pre className="bg-navy-darkest p-4 rounded-md text-sm text-gray-300 overflow-x-auto"><code>{JSON.stringify(trustPolicyPrincipal, null, 2)}</code></pre>
+        </div>
+        <p className="mt-4 text-navy-light">Under "Permissions policies", attach the `ZeroBillReadOnlyAccess` policy you created. Name the role `ZeroBillRole`.</p>
+        {step === 2 && <Button onClick={() => setStep(3)} className="mt-4">Next: Verify</Button>}
+      </Card>
 
-      <div style={{ border: '1-px solid #ddd', padding: '1rem', borderRadius: '8px', marginTop: '2rem' }}>
-        <h4><strong>Step 4: Verify Your Configuration</strong></h4>
-        <p>Enter the Role ARN you created and the temporary user's keys below.</p>
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: '1rem' }}>
-          <input name="roleArn" placeholder="Your IAM Role ARN (e.g., arn:aws:iam::...)" value={formState.roleArn} onChange={handleInputChange} required />
-          <input name="accessKeyId" placeholder="Temporary Access Key ID" value={formState.accessKeyId} onChange={handleInputChange} required />
-          <input name="secretAccessKey" placeholder="Temporary Secret Access Key" value={formState.secretAccessKey} onChange={handleInputChange} type="password" required />
-          <button type="submit" disabled={isSubmitting}>
+      <Card className={step < 3 ? 'opacity-50' : ''}>
+        <h2 className="text-xl font-semibold text-white">Step 3: Verify & Save</h2>
+        <p className="mt-2 text-navy-light">Finally, provide the ARN of the `ZeroBillRole` and a temporary Access Key from any IAM user in your account to perform a one-time validation.</p>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="roleArn" className="block text-sm font-medium text-navy-light">Role ARN</label>
+            <input id="roleArn" name="roleArn" placeholder="arn:aws:iam::123456789012:role/ZeroBillRole" value={formState.roleArn} onChange={handleInputChange} required className={formInputStyles} />
+          </div>
+          <div>
+            <label htmlFor="accessKeyId" className="block text-sm font-medium text-navy-light">Temporary Access Key ID</label>
+            <input id="accessKeyId" name="accessKeyId" placeholder="AKIAIOSFODNN7EXAMPLE" value={formState.accessKeyId} onChange={handleInputChange} required className={formInputStyles} />
+          </div>
+          <div>
+            <label htmlFor="secretAccessKey" className="block text-sm font-medium text-navy-light">Temporary Secret Access Key</label>
+            <input id="secretAccessKey" name="secretAccessKey" type="password" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" value={formState.secretAccessKey} onChange={handleInputChange} required className={formInputStyles} />
+          </div>
+          <Button type="submit" disabled={isSubmitting || !formState.roleArn || !formState.accessKeyId || !formState.secretAccessKey}>
             {isSubmitting ? "Validating..." : "Verify & Save Configuration"}
-          </button>
+          </Button>
+          {feedback.success && <p className="mt-2 text-green-400">✅ {feedback.success}</p>}
+          {feedback.error && <p className="mt-2 text-red-400">❌ {feedback.error}</p>}
         </form>
-        {success && <p style={{ marginTop: "1rem", color: "green", fontWeight: 'bold' }}>✅ {success}</p>}
-        {error && <p style={{ marginTop: "1rem", color: "red", fontWeight: 'bold' }}>❌ {error}</p>}
-      </div>
+      </Card>
+      
+      {step === 4 &&
+        <Card className="border-green-500/50 bg-green-900/20 text-center">
+            <h2 className="text-2xl font-bold text-green-300">✅ All Set!</h2>
+            <p className="mt-2 text-green-400">Your AWS account is successfully linked. Run a scan from your dashboard to start seeing insights.</p>
+            <Button onClick={() => navigate('/')} className="mt-4">Go to Dashboard</Button>
+        </Card>
+      }
     </div>
   );
 };

@@ -9,6 +9,7 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  replyTo: process.env.EMAIL_REPLY_TO,
 });
 
 exports.sendResetEmail = async (to, token) => {
@@ -26,5 +27,4 @@ exports.sendResetEmail = async (to, token) => {
   });
 
   logger.info({ to, url: nodemailer.getTestMessageUrl(info) }, "Password reset email sent.");
-
 };

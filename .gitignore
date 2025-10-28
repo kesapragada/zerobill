@@ -2,7 +2,8 @@
 /node_modules
 **/node_modules
 
-#package-lock.json 
+# Lockfiles (it's good practice to commit package-lock.json, so let's remove it from ignore)
+# package-lock.json
 yarn.lock
 
 # Environment Variables

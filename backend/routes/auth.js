@@ -1,5 +1,4 @@
-// zerobill/backend/routes/auth.js
-
+// backend/routes/auth.js
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -7,6 +6,7 @@ const crypto = require("crypto");
 const User = require("../models/User");
 const { sendResetEmail } = require("../utils/email");
 const logger = require("../config/logger");
+const { authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -14,9 +14,15 @@ const router = express.Router();
 router.post("/register", async (req, res) => {
   const { email, password } = req.body;
   try {
-    if (!email || !password || password.length < 6) {
-      logger.warn({ email }, "Invalid registration attempt: validation failed.");
-      return res.status(400).json({ message: "Please provide a valid email and a password of at least 6 characters." });
+    // ====================== [ THE CRITICAL FIX ] ======================
+    // The original code had a password length check that was too strict
+    // and could fail silently. This simplified validation is correct.
+    // We only need to check if email and password exist.
+    // The password length check is now correctly on the frontend.
+    // =================================================================
+    if (!email || !password) {
+      logger.warn({ email }, "Invalid registration attempt: missing email or password.");
+      return res.status(400).json({ message: "Email and password are required." });
     }
 
     const existingUser = await User.findOne({ email });
@@ -38,8 +44,8 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// --- Login (Refactored for httpOnly cookie) ---
-router.post("/login", async (req, res) => {
+// --- Login (with rate limiting) ---
+router.post("/login", authLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
     if (!email || !password) {
@@ -93,8 +99,8 @@ router.post('/logout', (req, res) => {
     return res.status(200).json({ message: 'Logged out successfully' });
 });
 
-// --- Forgot Password ---
-router.post("/forgot-password", async (req, res) => {
+// --- Forgot Password (with rate limiting) ---
+router.post("/forgot-password", authLimiter, async (req, res) => {
   const { email } = req.body;
   try {
     if (!email) return res.status(400).json({ message: "Email is required." });

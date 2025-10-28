@@ -1,8 +1,10 @@
-// zerobill/frontend/src/App.jsx
-
+// frontend/src/App.jsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-// This import is correct. Vite will automatically look for .js, .jsx, etc.
-import { AuthProvider } from "./context/AuthContext"; 
+import { AuthProvider } from "./context/AuthContext";
+
+// Layout Imports
+import AppLayout from "./layouts/AppLayout";
+import AuthLayout from "./layouts/AuthLayout";
 
 // Page Imports
 import Login from "./pages/Login";
@@ -11,25 +13,26 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import ConfigureAWS from "./pages/ConfigureAWS";
-
-// Component Imports
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
       <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        {/* Public auth routes with a dedicated layout */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+        </Route>
 
-        {/* Protected Routes */}
+        {/* Protected app routes with the main app layout */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/configure-aws" element={<ConfigureAWS />} />
-          {/* Add other protected routes here */}
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/configure-aws" element={<ConfigureAWS />} />
+          </Route>
         </Route>
       </Routes>
     </AuthProvider>

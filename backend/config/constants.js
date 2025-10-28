@@ -1,10 +1,10 @@
 // zerobill/backend/config/constants.js
-
 const QUEUE_NAMES = {
   BILLING_FETCH: 'billing-fetch',
   META_SCHEDULER: 'meta-scheduler',
   INFRA_FETCH: 'infra-fetch',
   DISCREPANCY_ENGINE: 'discrepancy-engine',
+  DEAD_LETTER: 'dead-letter-queue', // Added
 };
 
 const DISCREPANCY = {

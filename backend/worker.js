@@ -1,15 +1,16 @@
-// zerobill/backend/worker.js
-
+//backend/worker.js
 const { Worker } = require('bullmq');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 
-// Load environment variables at the VERY TOP
+// Load env variables
 dotenv.config();
 
 const logger = require('./config/logger');
 const redisConnection = require('./config/redis');
 const { QUEUE_NAMES } = require('./config/constants');
+const { deadLetterQueue } = require('./config/queues'); // Import the DLQ
+
 const billingFetcherProcessor = require('./workers/billingFetcher');
 const metaSchedulerProcessor = require('./workers/metaScheduler');
 const infraFetcherProcessor = require('./workers/infraFetcher');
@@ -25,17 +26,12 @@ mongoose.connect(process.env.MONGO_URI)
 
 logger.info('[Worker] Worker process starting...');
 
-// --- Worker Instantiations ---
+// --- Worker Instantiations with Retry Logic ---
 const billingWorker = new Worker(QUEUE_NAMES.BILLING_FETCH, billingFetcherProcessor, {
   connection: redisConnection,
   concurrency: 5,
   attempts: 3,
   backoff: { type: 'exponential', delay: 5000 },
-});
-
-const schedulerWorker = new Worker(QUEUE_NAMES.META_SCHEDULER, metaSchedulerProcessor, {
-  connection: redisConnection,
-  concurrency: 1,
 });
 
 const infraWorker = new Worker(QUEUE_NAMES.INFRA_FETCH, infraFetcherProcessor, {
@@ -45,6 +41,11 @@ const infraWorker = new Worker(QUEUE_NAMES.INFRA_FETCH, infraFetcherProcessor, {
   backoff: { type: 'exponential', delay: 10000 },
 });
 
+const schedulerWorker = new Worker(QUEUE_NAMES.META_SCHEDULER, metaSchedulerProcessor, {
+  connection: redisConnection,
+  concurrency: 1,
+});
+
 const discrepancyWorker = new Worker(QUEUE_NAMES.DISCREPANCY_ENGINE, discrepancyEngineProcessor, {
   connection: redisConnection,
   concurrency: 5,
@@ -52,13 +53,14 @@ const discrepancyWorker = new Worker(QUEUE_NAMES.DISCREPANCY_ENGINE, discrepancy
   backoff: { type: 'exponential', delay: 30000 },
 });
 
-// --- [LOGGING FIX] Helper function for logging worker events ---
+// --- Event Listeners with DLQ Logic ---
 const setupEventListeners = (workerName, worker) => {
   worker.on('completed', (job, result) => {
     const userId = job.data.userId || 'N/A';
     logger.info({ workerName, jobId: job.id, userId, result }, 'Job completed.');
   });
-  worker.on('failed', (job, err) => {
+
+  worker.on('failed', async (job, err) => {
     const userId = job.data.userId || 'N/A';
     logger.error({ 
       workerName, 
@@ -68,20 +70,33 @@ const setupEventListeners = (workerName, worker) => {
       maxAttempts: job.opts.attempts,
       error: err.message 
     }, 'Job failed.');
+
+    if (job.attemptsMade >= job.opts.attempts) {
+      logger.warn({ workerName, jobId: job.id, userId }, 'Job has failed all retries. Moving to Dead-Letter Queue.');
+      await deadLetterQueue.add('failed-job', {
+        originalQueue: workerName,
+        jobData: job.data,
+        jobId: job.id,
+        failedReason: err.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
+
   worker.on('active', (job) => {
     const userId = job.data.userId || 'N/A';
     logger.info({ workerName, jobId: job.id, userId }, 'Job is now active.');
   });
+
   worker.on('error', err => {
     logger.error({ workerName, err }, 'Worker encountered a critical error.');
   });
 };
 
-// --- Attach the loggers to all workers ---
+// Attach to all workers
 setupEventListeners('BillingFetch', billingWorker);
-setupEventListeners('MetaScheduler', schedulerWorker);
 setupEventListeners('InfraFetch', infraWorker);
 setupEventListeners('DiscrepancyEngine', discrepancyWorker);
+setupEventListeners('MetaScheduler', schedulerWorker);
 
 logger.info('[Worker] All workers initialized and waiting for jobs from Redis.');

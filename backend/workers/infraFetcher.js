@@ -1,4 +1,4 @@
-// zerobill/backend/workers/infraFetcher.js
+// FILE: backend/workers/infraFetcher.js
 
 const { STSClient, GetCallerIdentityCommand } = require('@aws-sdk/client-sts');
 const { EC2Client, DescribeInstancesCommand, DescribeRegionsCommand, DescribeVolumesCommand, DescribeAddressesCommand } = require('@aws-sdk/client-ec2');
@@ -11,9 +11,11 @@ const ResourceSnapshot = require('../models/ResourceSnapshot');
 const { discrepancyEngineQueue } = require('../config/queues');
 const logger = require('../config/logger');
 
-// --- Mock Logic Function ---
-async function runMock(userId) {
-    console.log('[MOCK_AWS] Providing mock infrastructure data.');
+// --- [REFACTORED] Mock Logic ---
+const mockProcessor = async (job) => {
+    const { userId } = job.data;
+    logger.info({ jobId: job.id, userId }, `[MOCK_AWS] Providing mock infrastructure data.`);
+
     const mockResources = [
         { service: 'EC2', resourceId: 'i-1234567890abcdef0', state: 'running', region: 'us-east-1', tags: [{ Key: 'Name', Value: 'prod-web-server' }] },
         { service: 'EBS', resourceId: 'vol-0987654321fedcba0', state: 'available', region: 'us-east-1', tags: [] },
@@ -25,13 +27,17 @@ async function runMock(userId) {
     await ResourceSnapshot.insertMany(mockResources);
     
     await discrepancyEngineQueue.add(`analyze-discrepancies-${userId}`, { userId });
-    console.log('[MOCK_AWS] Successfully enqueued discrepancy analysis.');
-    return { success: true, count: mockResources.length, message: `Mock infra scan complete.` };
-}
+    logger.info({ jobId: job.id, userId }, '[MOCK_AWS] Successfully enqueued discrepancy analysis.');
 
-// --- Real Logic Function ---
-async function runReal(userId) {
-    console.log(`[REAL_AWS] Starting real infrastructure scan for user: ${userId}`);
+    return { success: true, count: mockResources.length, message: `Mock infra scan complete.` };
+};
+
+
+// --- [REFACTORED] Real Logic ---
+const realProcessor = async (job) => {
+    const { userId } = job.data;
+    logger.info({ jobId: job.id, userId }, `[REAL_AWS] Starting real infrastructure scan.`);
+
     const awsConfig = await AwsConfig.findOne({ user: userId });
     if (!awsConfig) throw new Error(`AWS config not found for user ${userId}`);
 
@@ -62,12 +68,12 @@ async function runReal(userId) {
     }
 
     await discrepancyEngineQueue.add(`analyze-discrepancies-${userId}`, { userId });
-    console.log(`[REAL_AWS] Successfully enqueued discrepancy analysis for user: ${userId}`);
+    logger.info({ jobId: job.id, userId }, `[REAL_AWS] Successfully enqueued discrepancy analysis.`);
 
     return { success: true, count: allResources.length, message: `Infrastructure scan complete. Enqueued discrepancy analysis.` };
-}
+};
 
-// --- Regional Scanner (for Real Logic) ---
+// --- Helper Functions for Real Logic (unchanged) ---
 async function scanRegion(region, credentials, userId) {
     const ec2Client = new EC2Client({ region, credentials });
     const rdsClient = new RDSClient({ region, credentials });
@@ -83,18 +89,51 @@ async function scanRegion(region, credentials, userId) {
         const resultsArray = await Promise.all(promises);
         return resultsArray.flat();
     } catch (error) {
-        console.error(`[REAL_AWS] Failed to scan region ${region} for user ${userId}: ${error.message}`);
-        throw error;
+        logger.error({ error: error.message, region, userId }, `[REAL_AWS] Failed to scan region.`);
+        // Return empty array to not fail the whole scan for one region
+        return [];
     }
 }
 
-// --- Global Scanner (for Real Logic) ---
 async function scanGlobal(credentials) {
     const s3Client = new S3Client({ region: 'us-east-1', credentials });
     return await fetchS3Buckets(s3Client);
 }
 
-// --- Individual Service Fetchers (for Real Logic) ---
+async function fetchEc2Instances(client, region) { /* ... implementation is unchanged ... */ }
+async function fetchEbsVolumes(client, region) { /* ... implementation is unchanged ... */ }
+async function fetchEips(client, region) { /* ... implementation is unchanged ... */ }
+async function fetchRdsInstances(client, region) { /* ... implementation is unchanged ... */ }
+async function fetchS3Buckets(client) { /* ... implementation is unchanged ... */ }
+
+
+// --- [FIX] The Processor Factory ---
+const createProcessor = () => {
+  const isMock = process.env.MOCK_AWS === 'true';
+  logger.info(`Infra fetcher factory creating processor. MOCK_AWS=${isMock}`);
+  return isMock ? mockProcessor : realProcessor;
+};
+
+// --- [FIX] Universal Wrapper ---
+const processorWrapper = async (job) => {
+    const processor = createProcessor();
+    const { userId } = job.data;
+    const context = { jobId: job.id, userId };
+
+    try {
+        logger.info(context, 'Starting infrastructure scan job.');
+        const result = await processor(job);
+        logger.info({ ...context, result }, 'Infrastructure scan job completed successfully.');
+        return result;
+    } catch (error) {
+        logger.error({ ...context, err: error }, 'Infrastructure scan job failed.');
+        throw error;
+    }
+};
+
+module.exports = processorWrapper;
+
+// --- Helper Functions for Real Logic (copied from original for completeness) ---
 async function fetchEc2Instances(client, region) {
     const resources = [];
     let nextToken;
@@ -183,7 +222,7 @@ async function fetchS3Buckets(client) {
             const locationResponse = await client.send(new GetBucketLocationCommand({ Bucket: bucket.Name }));
             location = locationResponse.LocationConstraint || 'us-east-1';
         } catch (e) {
-            console.warn(`Could not get location for bucket ${bucket.Name}, defaulting to us-east-1. Error: ${e.message}`);
+            logger.warn(`Could not get location for bucket ${bucket.Name}, defaulting to us-east-1. Error: ${e.message}`);
         }
         
         resources.push({
@@ -198,25 +237,3 @@ async function fetchS3Buckets(client) {
 
     return resources;
 }
-
-// --- Main Processor ---
-const processor = async (job) => {
-    const { userId } = job.data;
-    const context = { jobId: job.id, userId };
-    try {
-        logger.info(context, 'Starting infrastructure scan job.');
-        let result;
-        if (process.env.MOCK_AWS === 'true') {
-            result = await runMock(userId);
-        } else {
-            result = await runReal(userId);
-        }
-        logger.info({ ...context, result }, 'Infrastructure scan job completed successfully.');
-        return result;
-    } catch (error) {
-        logger.error({ ...context, err: error }, 'Infrastructure scan job failed.');
-        throw error;
-    }
-};
-
-module.exports = processor;

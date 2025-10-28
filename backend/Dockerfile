@@ -1,8 +1,9 @@
 #backend/Dockerfile
 # Stage 1: The "Builder" Stage
-# Purpose: Install all dependencies (including dev) and create a full workspace.
-# ==================================
 FROM node:18-alpine AS builder
+
+# [FINAL FIX] Install build-base for robust native module compilation (like bcrypt)
+RUN apk add --no-cache build-base
 
 WORKDIR /usr/src/app
 
@@ -14,9 +15,6 @@ RUN npm ci
 
 # Copy the rest of the source code
 COPY . .
-
-# (Optional) If you had a build step like TypeScript, it would run here
-# RUN npm run build
 
 # ==================================
 # Stage 2: The "Production" Stage
@@ -33,12 +31,10 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=builder /usr/src/app/package.json /usr/src/app/package-lock.json ./
 
 # [CRITICAL FIX] Install ONLY production dependencies.
-# This is the key to a small and secure image.
 RUN npm install --omit=dev
 
 # Copy the application code from the 'builder' stage.
 # The --chown flag sets the correct permissions for our non-root user.
-# We copy the whole app directory structure, as it's already prepared.
 COPY --from=builder --chown=appuser:appgroup /usr/src/app .
 
 # Switch to the non-root user
