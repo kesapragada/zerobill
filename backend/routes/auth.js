@@ -71,9 +71,11 @@ router.post("/login", authLimiter, async (req, res) => {
     res.cookie('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'Lax',
+        // CRITICAL FINAL FIX: REMOVE sameSite RESTRICTION
+        // sameSite: 'Lax', // COMMENT THIS LINE OUT
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
+
     
     logger.info({ userId: user._id, email }, "User logged in successfully.");
 
