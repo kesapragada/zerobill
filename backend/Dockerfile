@@ -1,5 +1,6 @@
-#backend/Dockerfile
 # Stage 1: The "Builder" Stage
+# Purpose: Install all dependencies (including dev) and create a full workspace.
+# ==================================
 FROM node:18-alpine AS builder
 
 # [FINAL FIX] Install build-base for robust native module compilation (like bcrypt)
@@ -10,8 +11,8 @@ WORKDIR /usr/src/app
 # Copy package files first to leverage Docker cache
 COPY package*.json ./
 
-# Use 'npm ci' for faster, more reliable builds in CI environments
-RUN npm ci
+# CRITICAL FIX: Use 'npm install' instead of 'npm ci' to overcome lock file version issues
+RUN npm install
 
 # Copy the rest of the source code
 COPY . .
